@@ -23,7 +23,7 @@ nssa = { git = "https://github.com/logos-blockchain/logos-execution-zone.git", r
 nssa_core = { git = "https://github.com/logos-blockchain/logos-execution-zone.git", rev = "{{lez_pin}}" }
 wallet = { git = "https://github.com/logos-blockchain/logos-execution-zone.git", rev = "{{lez_pin}}" }
 common = { git = "https://github.com/logos-blockchain/logos-execution-zone.git", rev = "{{lez_pin}}" }
-sequencer_service_rpc = { git = "https://github.com/logos-blockchain/logos-execution-zone.git", rev = "{{lez_pin}}", features = ["client"] }
+sequencer_service_rpc = { git = "https://github.com/logos-blockchain/logos-execution-zone.git", rev = "{{lez_pin}}", default-features = false, features = ["client"] }
 
 anyhow = "1.0.98"
 risc0-zkvm = { version = "3.0.5", features = ["std"] }
@@ -44,4 +44,5 @@ example_program_deployment_methods = { path = "methods" }
 
 anyhow.workspace = true
 clap.workspace = true
+hex.workspace = true
 tokio = { workspace = true, features = ["macros"] }

@@ -1,58 +1,46 @@
-use nssa::{AccountId, program::Program};
+use anyhow::Context;
+use clap::Parser;
+use example_program_deployment_methods::HELLO_WORLD_ELF;
+use nssa::program::Program;
 use wallet::{PrivacyPreservingAccount, WalletCore};
 
-// Before running this example, compile the `hello_world.rs` guest program with:
-//
-//   cargo risczero build --manifest-path examples/program_deployment/methods/guest/Cargo.toml
-//
-// Note: you must run the above command from the root of the `lssa` repository.
-// Note: The compiled binary file is stored in
-// methods/guest/target/riscv32im-risc0-zkvm-elf/docker/hello_world.bin
-//
-//
-// Usage:
-//   cargo run --bin run_hello_world_private /path/to/guest/binary <account_id>
-//
-// Note: the provided account_id needs to be of a private self owned account
-//
-// Example:
-//   cargo run --bin run_hello_world_private \
-//     methods/guest/target/riscv32im-risc0-zkvm-elf/docker/hello_world.bin \
-//     Ds8q5PjLcKwwV97Zi7duhRVF9uwA2PuYMoLL7FwCzsXE
+#[path = "../lib.rs"]
+mod scaffold_lib;
+use scaffold_lib::runner_support::{load_program, parse_account_id};
+
+#[derive(Parser, Debug)]
+struct Cli {
+    #[arg(long)]
+    program_path: Option<String>,
+    account_id: String,
+}
 
 #[tokio::main]
-async fn main() {
-    // Initialize wallet
-    let wallet_core = WalletCore::from_env().unwrap();
+async fn main() -> anyhow::Result<()> {
+    let cli = Cli::parse();
+    let wallet_core = WalletCore::from_env().context("failed to initialize wallet from environment")?;
 
-    // Parse arguments
-    // First argument is the path to the program binary
-    let program_path = std::env::args_os().nth(1).unwrap().into_string().unwrap();
-    // Second argument is the account_id
-    let account_id: AccountId = std::env::args_os()
-        .nth(2)
-        .unwrap()
-        .into_string()
-        .unwrap()
-        .parse()
-        .unwrap();
+    let program = load_program(cli.program_path.as_deref(), HELLO_WORLD_ELF, "hello_world")?;
+    let account_id = parse_account_id(&cli.account_id)?;
 
-    // Load the program
-    let bytecode: Vec<u8> = std::fs::read(program_path).unwrap();
-    let program = Program::new(bytecode).unwrap();
-
-    // Define the desired greeting in ASCII
     let greeting: Vec<u8> = vec![72, 111, 108, 97, 32, 109, 117, 110, 100, 111, 33];
-
     let accounts = vec![PrivacyPreservingAccount::PrivateOwned(account_id)];
 
-    // Construct and submit the privacy-preserving transaction
-    wallet_core
+    let (response, _) = wallet_core
         .send_privacy_preserving_tx(
             accounts,
-            Program::serialize_instruction(greeting).unwrap(),
+            Program::serialize_instruction(greeting)
+                .context("failed to serialize private instruction payload")?,
             &program.into(),
         )
         .await
-        .unwrap();
+        .map_err(|err| anyhow::anyhow!("failed to submit private transaction: {err}"))?;
+
+    println!(
+        "submitted transaction: tx_hash={}",
+        hex::encode(response.0)
+    );
+    println!("verification hint: wallet account sync-private");
+
+    Ok(())
 }
